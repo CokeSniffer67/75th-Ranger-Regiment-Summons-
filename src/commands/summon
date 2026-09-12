@@ -1,0 +1,112 @@
+import {
+    SlashCommandBuilder,
+    PermissionFlagsBits,
+    ChannelType
+} from 'discord.js';
+
+export const data = new SlashCommandBuilder()
+    .setName('summon')
+    .setDescription('Summon a user to a voice channel')
+
+    .addUserOption(option =>
+        option
+            .setName('user')
+            .setDescription('User to summon')
+            .setRequired(true)
+    )
+
+    .addChannelOption(option =>
+        option
+            .setName('channel')
+            .setDescription('Voice channel to summon them to')
+            .addChannelTypes(
+                ChannelType.GuildVoice,
+                ChannelType.GuildStageVoice
+            )
+            .setRequired(true)
+    )
+
+    .addStringOption(option =>
+        option
+            .setName('reason')
+            .setDescription('Reason for the summon')
+            .setRequired(false)
+    )
+
+    .setDefaultMemberPermissions(
+        PermissionFlagsBits.MoveMembers
+    );
+
+export async function execute(interaction) {
+
+    const user = interaction.options.getUser('user');
+    const channel = interaction.options.getChannel('channel');
+
+    const reason =
+        interaction.options.getString('reason') ||
+        'No reason provided';
+
+    const member = await interaction.guild.members
+        .fetch(user.id)
+        .catch(() => null);
+
+    if (!member) {
+        return interaction.reply({
+            content: '❌ User not found in this server.',
+            ephemeral: true
+        });
+    }
+
+    if (!member.voice.channel) {
+        return interaction.reply({
+            content: '❌ That user is not in a voice channel.',
+            ephemeral: true
+        });
+    }
+
+    if (!interaction.member.permissions.has(
+        PermissionFlagsBits.MoveMembers
+    )) {
+        return interaction.reply({
+            content: '❌ You need the Move Members permission.',
+            ephemeral: true
+        });
+    }
+
+    const botMember = interaction.guild.members.me;
+
+    if (!botMember?.permissions.has(
+        PermissionFlagsBits.MoveMembers
+    )) {
+        return interaction.reply({
+            content: '❌ I need the Move Members permission.',
+            ephemeral: true
+        });
+    }
+
+    if (member.voice.channel.id === channel.id) {
+        return interaction.reply({
+            content: `❌ ${user.username} is already in that channel.`,
+            ephemeral: true
+        });
+    }
+
+    try {
+
+        await member.voice.setChannel(channel, reason);
+
+        await interaction.reply({
+            content: `✅ ${user.username}`,
+            ephemeral: true
+        });
+
+    } catch (error) {
+
+        console.error('Summon command error:', error);
+
+        await interaction.reply({
+            content: '❌ I could not summon that user.',
+            ephemeral: true
+        });
+    }
+}
